@@ -1,0 +1,21 @@
+# Terraform state & local dirs (never commit)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Build artifacts
+build/
+*.zip
+
+# GENUINE SECRETS ONLY — private keys / client profiles.
+# (These are local, one-time cert-generation byproducts; Terraform only uses
+#  the resulting ACM ARN, never these files.)
+*.key
+*.ovpn
+pki/
+
+# NOTE: config IS committable — tfvars and SAML metadata XML are safe:
+#   - *.tfvars       : region/VPC/subnet/ARNs — references, not secrets
+#   - idc/*.xml      : SAML metadata — public (IdP endpoints + PUBLIC signing cert)
+#   - *.crt          : public certificates (not private keys)

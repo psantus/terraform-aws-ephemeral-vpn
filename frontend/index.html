@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VPN</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      background: #0f172a; color: #e2e8f0;
+    }
+    .card {
+      width: min(92vw, 420px); background: #1e293b; border-radius: 16px;
+      padding: 28px; box-shadow: 0 10px 40px rgba(0,0,0,.4);
+    }
+    h1 { margin: 0 0 4px; font-size: 20px; }
+    p.sub { margin: 0 0 20px; color: #94a3b8; font-size: 13px; }
+    label { display: block; font-size: 12px; color: #94a3b8; margin-bottom: 6px; }
+    input[type=password] {
+      width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid #334155;
+      background: #0f172a; color: #e2e8f0; font-size: 14px; margin-bottom: 14px;
+    }
+    .row { display: flex; gap: 10px; }
+    button {
+      flex: 1; padding: 11px; border: 0; border-radius: 10px; font-size: 14px;
+      font-weight: 600; cursor: pointer;
+    }
+    .primary { background: #22c55e; color: #052e16; }
+    .secondary { background: #334155; color: #e2e8f0; }
+    .ghost { background: transparent; color: #94a3b8; border: 1px solid #334155; }
+    .danger { background: #ef4444; color: #450a0a; }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .status {
+      margin-top: 18px; padding: 14px; border-radius: 10px; font-size: 14px;
+      background: #0f172a; border: 1px solid #334155; min-height: 44px;
+      word-break: break-word;
+    }
+    .status.active { border-color: #22c55e; }
+    .status.starting { border-color: #eab308; }
+    .status.stopping { border-color: #f97316; }
+    .status.off { border-color: #64748b; }
+    .status.error { border-color: #ef4444; color: #fca5a5; }
+    .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
+    .dot.active { background: #22c55e; } .dot.starting { background: #eab308; }
+    .dot.stopping { background: #f97316; }
+    .dot.off { background: #64748b; } .dot.error { background: #ef4444; }
+    code { background: #0b1220; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+    .remember { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #94a3b8; margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="appTitle">VPN</h1>
+    <p class="sub">Sign in with your company account, then start the VPN.</p>
+
+    <div class="row" style="margin-bottom:14px; align-items:center;">
+      <button id="btnLogin" class="primary" style="display:none;">Sign in</button>
+      <button id="btnLogout" class="ghost" style="display:none;">Sign out</button>
+      <span id="user" style="font-size:12px; color:#94a3b8;"></span>
+    </div>
+
+    <div class="row">
+      <button id="btnOn" class="primary" disabled>Start VPN</button>
+      <button id="btnStatus" class="secondary" disabled>Status</button>
+      <button id="btnOff" class="danger" disabled>Stop</button>
+    </div>
+
+    <div id="status" class="status off"><span class="dot off"></span>Please sign in.</div>
+    <div id="progressWrap" style="display:none; margin-top:12px;">
+      <div style="height:8px; background:#0f172a; border:1px solid #334155; border-radius:6px; overflow:hidden;">
+        <div id="progressBar" style="height:100%; width:0%; background:#eab308; transition:width .5s ease;"></div>
+      </div>
+      <div id="progressLabel" style="font-size:11px; color:#94a3b8; margin-top:6px;"></div>
+    </div>
+  </div>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
