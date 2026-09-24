@@ -24,6 +24,9 @@ and toggled from a small web page. No servers to patch: it uses **AWS Client VPN
 
 ## Architecture
 
+![Architecture](docs/architecture.drawio) — editable diagram in `docs/architecture.drawio` (diagrams.net).
+
+
 ```
 Browser SPA (CloudFront + S3)
   │  Cognito Hosted UI (Authorization Code + PKCE)
