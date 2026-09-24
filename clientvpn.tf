@@ -68,6 +68,10 @@ resource "aws_acm_certificate" "server" {
   private_key       = tls_private_key.server[0].private_key_pem
   certificate_body  = tls_locally_signed_cert.server[0].cert_pem
   certificate_chain = tls_self_signed_cert.ca[0].cert_pem
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 
