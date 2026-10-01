@@ -69,15 +69,6 @@ data "aws_iam_policy_document" "lambda" {
   }
 
   statement {
-    sid = "AssocTimestampParam"
-    actions = [
-      "ssm:GetParameter",
-      "ssm:PutParameter",
-    ]
-    resources = ["arn:aws:ssm:${var.region}:${data.aws_caller_identity.current.account_id}:parameter/${local.name}/*"]
-  }
-
-  statement {
     sid = "Logs"
     actions = [
       "logs:CreateLogGroup",
@@ -135,9 +126,6 @@ resource "aws_lambda_function" "toggle" {
     variables = {
       CLIENT_VPN_ENDPOINT_ID = aws_ec2_client_vpn_endpoint.this.id
       TARGET_SUBNET_ID       = var.target_subnet_id
-      IDLE_TIMEOUT_MINUTES   = tostring(var.idle_timeout_minutes)
-      GRACE_MINUTES          = tostring(var.grace_minutes)
-      ASSOC_TS_PARAM         = "/${local.name}/${aws_ec2_client_vpn_endpoint.this.id}/last-associated-at"
       VPN_ENDPOINT_URL       = aws_ec2_client_vpn_endpoint.this.dns_name
       PORTAL_URL             = var.auth_mode == "federated" ? "https://self-service.clientvpn.amazonaws.com/endpoints/${aws_ec2_client_vpn_endpoint.this.id}" : ""
     }
@@ -159,9 +147,6 @@ resource "aws_lambda_function" "idle" {
     variables = {
       CLIENT_VPN_ENDPOINT_ID = aws_ec2_client_vpn_endpoint.this.id
       TARGET_SUBNET_ID       = var.target_subnet_id
-      IDLE_TIMEOUT_MINUTES   = tostring(var.idle_timeout_minutes)
-      GRACE_MINUTES          = tostring(var.grace_minutes)
-      ASSOC_TS_PARAM         = "/${local.name}/${aws_ec2_client_vpn_endpoint.this.id}/last-associated-at"
     }
   }
 }
@@ -169,7 +154,7 @@ resource "aws_lambda_function" "idle" {
 resource "aws_cloudwatch_event_rule" "idle" {
   name                = "${local.name}-idle-check"
   description         = "Periodically disassociate Client VPN when idle"
-  schedule_expression = "rate(1 hour)"
+  schedule_expression = "rate(15 minutes)"
 }
 
 resource "aws_cloudwatch_event_target" "idle" {

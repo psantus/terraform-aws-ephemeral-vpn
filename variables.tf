@@ -114,18 +114,6 @@ variable "server_cert_domain" {
   default     = ""
 }
 
-variable "idle_timeout_minutes" {
-  description = "Auto-disassociate after this many minutes with zero active connections."
-  type        = number
-  default     = 30
-}
-
-variable "grace_minutes" {
-  description = "Grace period after association during which idle-check will not auto-disassociate (lets users connect before the first check)."
-  type        = number
-  default     = 15
-}
-
 variable "expected_assoc_sec" {
   description = "Expected Client VPN association time (seconds) for the web UI progress estimate. Measured deterministically at ~369s (associate API call -> state=associated) on 2026-09-18; association time varies (~200-370s), so this is an estimate. The bar snaps to 100% only when truly associated."
   type        = number

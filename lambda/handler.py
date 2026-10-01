@@ -20,7 +20,6 @@ Environment:
   TARGET_SUBNET_ID        required (subnet to associate on "on")
   VPN_ENDPOINT_URL        optional (endpoint DNS, informational)
   PORTAL_URL              optional (self-service portal URL, federated auth)
-  IDLE_TIMEOUT_MINUTES    optional (default 30)
 """
 
 import json
@@ -31,15 +30,9 @@ import boto3
 
 ec2 = boto3.client("ec2")
 cloudwatch = boto3.client("cloudwatch")
-ssm = boto3.client("ssm")
 
 ENDPOINT_ID = os.environ["CLIENT_VPN_ENDPOINT_ID"]
 TARGET_SUBNET_ID = os.environ["TARGET_SUBNET_ID"]
-IDLE_TIMEOUT_MINUTES = int(os.environ.get("IDLE_TIMEOUT_MINUTES", "30"))
-# Grace period after association during which we never auto-disassociate,
-# giving users time to actually connect before the first idle check.
-GRACE_MINUTES = int(os.environ.get("GRACE_MINUTES", "15"))
-ASSOC_TS_PARAM = os.environ.get("ASSOC_TS_PARAM", f"/ephemeral-vpn/{ENDPOINT_ID}/last-associated-at")
 # Client VPN endpoint DNS shown to users when the VPN is active.
 VPN_ENDPOINT_URL = os.environ.get("VPN_ENDPOINT_URL", "")
 # Self-service portal URL (federated auth only) — the user-facing link.
@@ -205,17 +198,6 @@ def _associate():
         ClientVpnEndpointId=ENDPOINT_ID,
         SubnetId=TARGET_SUBNET_ID,
     )
-    # Record association time so idle_check honors the "associated within the
-    # last hour" rule.
-    try:
-        ssm.put_parameter(
-            Name=ASSOC_TS_PARAM,
-            Value=datetime.now(timezone.utc).isoformat(),
-            Type="String",
-            Overwrite=True,
-        )
-    except Exception:
-        pass
     return {
         "message": "VPN starting",
         "state": r.get("Status", {}).get("Code"),
@@ -301,53 +283,70 @@ def handler(event, context):
 # EventBridge idle-check entrypoint
 # --------------------------------------------------------------------------- #
 def idle_check(event, context):
-    """Hourly idle check.
+    """Idle check, run every 15 minutes by EventBridge.
 
-    Disassociate the endpoint ONLY IF, over the last full hour:
-      - there were zero active connections, AND
-      - the association itself was made more than an hour ago
-        (i.e. it wasn't associated during this same hour).
-    Otherwise keep it associated.
+    Look at ActiveConnectionsCount as 5-minute datapoints over the last 15
+    minutes (up to 3 datapoints). The endpoint publishes this metric only while
+    a subnet is associated, so:
+
+      - No datapoints          -> the metric wasn't publishing in the window
+                                  (not meaningfully associated / just came up).
+                                  Do nothing.
+      - Datapoints exist AND
+        the most-recent one == 0 -> association was up during the window but no
+                                  one is connected now. Disassociate.
+      - Most-recent datapoint > 0 -> someone is connected. Keep it associated.
+
+    Using the most-recent datapoint (rather than a max over the window) means an
+    active session keeps the VPN up, while a session that has ended lets the next
+    15-minute tick tear it down — bounding idle cost to ~15 minutes of
+    EndpointHours past the last connection.
     """
     active = _active_associations(_list_associations())
     if not active:
         return {"idle": True, "action": "none (not associated)"}
 
     now = datetime.now(timezone.utc)
-    window = timedelta(hours=1)
+    window = timedelta(minutes=15)
 
-    # 1) Was the association made within the last hour? If so, keep it.
-    try:
-        p = ssm.get_parameter(Name=ASSOC_TS_PARAM)
-        associated_at = datetime.fromisoformat(p["Parameter"]["Value"])
-        age = now - associated_at
-        if age < window:
-            return {
-                "idle": False,
-                "action": "associated within the last hour",
-                "age_minutes": round(age.total_seconds() / 60.0, 1),
-            }
-    except ssm.exceptions.ParameterNotFound:
-        # No timestamp recorded; fall through to connection check.
-        pass
-    except Exception:
-        pass
-
-    # 2) Any connections in the last full hour?
+    # ActiveConnectionsCount as 5-min datapoints over the last 15 minutes.
     metrics = cloudwatch.get_metric_statistics(
         Namespace="AWS/ClientVPN",
         MetricName="ActiveConnectionsCount",
         Dimensions=[{"Name": "Endpoint", "Value": ENDPOINT_ID}],
         StartTime=now - window,
         EndTime=now,
-        Period=3600,
+        Period=300,
         Statistics=["Maximum"],
     )
     datapoints = metrics.get("Datapoints", [])
-    max_conns = max((d["Maximum"] for d in datapoints), default=0.0)
 
-    if max_conns > 0:
-        return {"idle": False, "max_connections": max_conns, "action": "kept associated"}
+    # No datapoints -> metric not publishing in the window; nothing to do.
+    if not datapoints:
+        return {
+            "idle": False,
+            "datapoints": 0,
+            "action": "no datapoints in window; kept associated",
+        }
 
+    # Datapoints exist: evaluate the most-recent one.
+    datapoints.sort(key=lambda d: d["Timestamp"])
+    last_conns = datapoints[-1]["Maximum"]
+
+    if last_conns > 0:
+        return {
+            "idle": False,
+            "datapoints": len(datapoints),
+            "last_connections": last_conns,
+            "action": "kept associated",
+        }
+
+    # Datapoints exist AND the latest == 0 -> idle. Disassociate.
     result = _disassociate()
-    return {"idle": True, "max_connections": 0, "action": "disassociated", "detail": result}
+    return {
+        "idle": True,
+        "datapoints": len(datapoints),
+        "last_connections": 0,
+        "action": "disassociated",
+        "detail": result,
+    }
