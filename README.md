@@ -24,7 +24,9 @@ and toggled from a small web page. No servers to patch: it uses **AWS Client VPN
 
 ## Architecture
 
-![Architecture](docs/architecture.drawio) — editable diagram in `docs/architecture.drawio` (diagrams.net).
+![Architecture](docs/ephemeral-vpn-architecture.webp)
+
+> Editable source: [`docs/architecture.drawio`](docs/architecture.drawio) (diagrams.net).
 
 
 ```
